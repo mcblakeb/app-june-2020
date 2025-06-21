@@ -84,7 +84,7 @@ export default function Home() {
     <div className="min-h-screen flex justify-center">
       <main className="flex flex-col gap-[32px] mt-10 items-center w-full max-w-4xl px-4">
         <div className="w-full max-w-2xl text-center">
-          <h1 className="text-4xl font-bold">Provider Match</h1>
+          <h1 className="text-4xl font-bold">Patient Match</h1>
           <button
             onClick={handleReset}
             disabled={isResetting}
