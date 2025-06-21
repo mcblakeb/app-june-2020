@@ -172,11 +172,6 @@ export default function ProviderCard({
           <span className="bg-green-100 text-green-800 text-xs font-medium px-2 py-1 rounded">
             {formatScore(score)}% Match
           </span>
-          {isLoading && (
-            <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-            </div>
-          )}
         </div>
         <div className="flex items-center gap-2">
           <AcceptButton
