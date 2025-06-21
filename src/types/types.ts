@@ -22,8 +22,17 @@ export interface ExternalPatient {
   ZipCode: string;
 }
 
+export type MatchStatus = 0 | 1 | 2;
+
+export const MatchStatusLabels: Record<MatchStatus, string> = {
+  0: "None",
+  1: "Approved",
+  2: "Denied",
+};
+
 export interface PatientMatch {
   internal: Partial<InternalPatient>;
   external: Partial<ExternalPatient>;
   score: number;
+  status?: MatchStatus;
 }

@@ -1,70 +1,71 @@
 "use server";
 
 import { getInternalPatients, getExternalPatients } from "../util/datastore";
-import { InternalPatient, ExternalPatient, PatientMatch } from "../types/types";
-import { similarityRatio, tokenOverlapScore } from "../util/l-distance";
+import {
+  InternalPatient,
+  ExternalPatient,
+  PatientMatch,
+  MatchStatus,
+} from "../types/types";
+import { similarityRatio } from "../util/l-distance";
+import { readAllMatches } from "@/actions/file-actions";
 
 function normalize(str?: string): string {
   // Remove non-alphanumeric characters and convert to lowercase
   return (str || "").toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-const SearchFields = [
-  "FirstName",
-  "LastName",
-  "DOB",
-  "PhoneNumber",
-  "Address",
-  "City",
-  "ZipCode",
-];
+function normalizeDate(dateStr?: string): string {
+  if (!dateStr) return "";
 
-function matchesQuery(
-  patient: Partial<InternalPatient> | Partial<ExternalPatient>,
-  query: string
-): boolean {
-  const normalizedQuery = normalize(query);
+  const normalized = dateStr.trim();
 
-  // First check name fields with higher priority
-  const firstName = normalize(patient.FirstName || "");
-  const lastName = normalize(patient.LastName || "");
+  // Handle format: "21-Oct-1977" -> "1977-10-21"
+  const monthNames: { [key: string]: string } = {
+    jan: "01",
+    feb: "02",
+    mar: "03",
+    apr: "04",
+    may: "05",
+    jun: "06",
+    jul: "07",
+    aug: "08",
+    sep: "09",
+    oct: "10",
+    nov: "11",
+    dec: "12",
+  };
 
-  // Check if query matches first or last name exactly or as substring
-  if (
-    firstName.includes(normalizedQuery) ||
-    lastName.includes(normalizedQuery)
-  ) {
-    return true;
-  }
+  // Pattern: DD-MMM-YYYY or DD-MMM-YY
+  const pattern1 = /^(\d{1,2})-([a-zA-Z]{3})-(\d{2,4})$/;
+  const match1 = normalized.match(pattern1);
 
-  // Check if query is similar to names using similarity functions
-  if (
-    similarityRatio(firstName, normalizedQuery) > 0.7 ||
-    similarityRatio(lastName, normalizedQuery) > 0.7
-  ) {
-    return true;
-  }
+  if (match1) {
+    const day = match1[1].padStart(2, "0");
+    const month = monthNames[match1[2].toLowerCase()];
+    let year = match1[3];
 
-  // For other fields, be more strict - only check if the field contains the query
-  // and the field is reasonably sized (avoid matching in long addresses)
-  for (const key of ["DOB", "PhoneNumber", "City", "ZipCode"]) {
-    const value = (patient as any)[key];
-    if (value) {
-      const normalizedValue = normalize(value);
-      // Only check if the field contains the query, not the other way around
-      if (normalizedValue.includes(normalizedQuery)) {
-        return true;
-      }
+    // Handle 2-digit years
+    if (year.length === 2) {
+      year = parseInt(year) < 50 ? `20${year}` : `19${year}`;
     }
+
+    return `${year}-${month}-${day}`;
   }
 
-  // For address, be more careful - only match if it's a reasonable match
-  const address = normalize(patient.Address || "");
-  if (address.includes(normalizedQuery) && address.length < 50) {
-    return true;
+  // Pattern: YYYY-MM-DD (already in correct format)
+  const pattern2 = /^(\d{4})-(\d{1,2})-(\d{1,2})$/;
+  const match2 = normalized.match(pattern2);
+
+  if (match2) {
+    const year = match2[1];
+    const month = match2[2].padStart(2, "0");
+    const day = match2[3].padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
-  return false;
+  // If no pattern matches, return normalized string
+  return normalized;
 }
 
 function arePatientsAMatch(
@@ -76,7 +77,7 @@ function arePatientsAMatch(
     normalize(internal.FirstName) === normalize(external.FirstName);
   const lastNameMatch =
     normalize(internal.LastName) === normalize(external.LastName);
-  const dobMatch = normalize(internal.DOB) === normalize(external.DOB);
+  const dobMatch = normalizeDate(internal.DOB) === normalizeDate(external.DOB);
   const phoneMatch =
     normalize(internal.PhoneNumber) === normalize(external.PhoneNumber) &&
     internal.PhoneNumber !== "";
@@ -109,102 +110,85 @@ function arePatientsAMatch(
 
 function calculateMatchScore(
   internal: Partial<InternalPatient>,
-  external: Partial<ExternalPatient>,
-  query: string
+  external: Partial<ExternalPatient>
 ): number {
-  let score = 0;
-  const normalizedQuery = normalize(query);
-
-  // Check if query matches either patient
-  let queryMatchScore = 0;
-  for (const key of SearchFields) {
-    const internalValue = (internal as any)[key];
-    const externalValue = (external as any)[key];
-
-    if (internalValue) {
-      const normalizedValue = normalize(internalValue);
-      if (normalizedValue === normalizedQuery)
-        queryMatchScore = Math.max(queryMatchScore, 1.0);
-      else if (
-        normalizedValue.includes(normalizedQuery) ||
-        normalizedQuery.includes(normalizedValue)
-      ) {
-        queryMatchScore = Math.max(queryMatchScore, 0.8);
-      } else if (similarityRatio(normalizedValue, normalizedQuery) > 0.7) {
-        queryMatchScore = Math.max(queryMatchScore, 0.6);
-      } else if (tokenOverlapScore(normalizedValue, normalizedQuery) > 0.5) {
-        queryMatchScore = Math.max(queryMatchScore, 0.4);
-      }
-    }
-
-    if (externalValue) {
-      const normalizedValue = normalize(externalValue);
-      if (normalizedValue === normalizedQuery)
-        queryMatchScore = Math.max(queryMatchScore, 1.0);
-      else if (
-        normalizedValue.includes(normalizedQuery) ||
-        normalizedQuery.includes(normalizedValue)
-      ) {
-        queryMatchScore = Math.max(queryMatchScore, 0.8);
-      } else if (similarityRatio(normalizedValue, normalizedQuery) > 0.7) {
-        queryMatchScore = Math.max(queryMatchScore, 0.6);
-      } else if (tokenOverlapScore(normalizedValue, normalizedQuery) > 0.5) {
-        queryMatchScore = Math.max(queryMatchScore, 0.4);
-      }
-    }
-  }
-
-  // Calculate patient match score
-  let patientMatchScore = 0;
+  // Calculate exact matches
   const firstNameMatch =
     normalize(internal.FirstName) === normalize(external.FirstName);
   const lastNameMatch =
     normalize(internal.LastName) === normalize(external.LastName);
-  const dobMatch = normalize(internal.DOB) === normalize(external.DOB);
+  const dobMatch = normalizeDate(internal.DOB) === normalizeDate(external.DOB);
   const phoneMatch =
     normalize(internal.PhoneNumber) === normalize(external.PhoneNumber) &&
     internal.PhoneNumber !== "";
   const addressMatch =
     normalize(internal.Address) === normalize(external.Address);
 
-  if (firstNameMatch && lastNameMatch) patientMatchScore = 1.0;
-  else if (dobMatch && lastNameMatch) patientMatchScore = 0.9;
-  else if (phoneMatch) patientMatchScore = 0.8;
-  else if (addressMatch) patientMatchScore = 0.7;
-  else {
-    const firstNameSimilarity = similarityRatio(
-      normalize(internal.FirstName || ""),
-      normalize(external.FirstName || "")
-    );
-    const lastNameSimilarity = similarityRatio(
-      normalize(internal.LastName || ""),
-      normalize(external.LastName || "")
-    );
-    const addressSimilarity = similarityRatio(
-      normalize(internal.Address || ""),
-      normalize(external.Address || "")
-    );
+  // Calculate similarity ratios for all fields
+  const firstNameSimilarity = similarityRatio(
+    normalize(internal.FirstName || ""),
+    normalize(external.FirstName || "")
+  );
+  const lastNameSimilarity = similarityRatio(
+    normalize(internal.LastName || ""),
+    normalize(external.LastName || "")
+  );
+  const addressSimilarity = similarityRatio(
+    normalize(internal.Address || ""),
+    normalize(external.Address || "")
+  );
 
-    if (firstNameSimilarity > 0.8 && lastNameSimilarity > 0.8)
-      patientMatchScore = 0.6;
-    else if (addressSimilarity > 0.7 && lastNameSimilarity > 0.7)
-      patientMatchScore = 0.5;
+  // Calculate weighted score based on all available data
+  let totalScore = 0;
+  let totalWeight = 0;
+
+  totalScore += (firstNameMatch ? 1.0 : firstNameSimilarity) * 0.25;
+  totalWeight += 0.25;
+
+  totalScore += (lastNameMatch ? 1.0 : lastNameSimilarity) * 0.15;
+  totalWeight += 0.15;
+
+  totalScore += (dobMatch ? 1.0 : 0.0) * 0.25;
+  totalWeight += 0.25;
+
+  totalScore += (phoneMatch ? 1.0 : 0.0) * 0.2;
+  totalWeight += 0.2;
+
+  totalScore += (addressMatch ? 1.0 : addressSimilarity) * 0.15;
+  totalWeight += 0.15;
+
+  // Calculate final score as weighted average
+  const finalScore = totalWeight > 0 ? totalScore / totalWeight : 0;
+
+  // Apply bonus for multiple exact matches
+  let bonus = 0;
+  const exactMatches = [
+    firstNameMatch,
+    lastNameMatch,
+    dobMatch,
+    phoneMatch,
+    addressMatch,
+  ].filter(Boolean).length;
+
+  // Only apply bonus if firstNameMatch is true
+  if ((firstNameMatch || lastNameMatch) && exactMatches >= 3) {
+    bonus = 0.1;
+  } else if ((firstNameMatch || lastNameMatch) && exactMatches >= 2) {
+    bonus = 0.05;
   }
 
-  // Combine scores (query match is more important)
-  score = queryMatchScore * 0.7 + patientMatchScore * 0.3;
+  // Apply bonus as a percentage of remaining possible score
+  const remainingScore = 1.0 - finalScore;
+  const bonusAmount = remainingScore * bonus;
 
-  return score;
+  return Math.min(1.0, finalScore + bonusAmount);
 }
 
 /**
- * Finds up to 5 likely patient matches based on a user query string.
- * @param query - The user input string to match against patient fields.
- * @returns Up to 5 best matches with details.
+ * Finds all likely patient matches between internal and external databases.
+ * @returns All matches found between internal and external patients.
  */
-export async function findLikelyPatientMatches(
-  query: string
-): Promise<PatientMatch[]> {
+export async function findAllPatientMatches(): Promise<PatientMatch[]> {
   const [internalPatients, externalPatients] = await Promise.all([
     getInternalPatients(),
     getExternalPatients(),
@@ -212,20 +196,75 @@ export async function findLikelyPatientMatches(
   const matches: PatientMatch[] = [];
 
   for (const internal of internalPatients) {
-    if (!matchesQuery(internal, query)) {
-      continue;
-    }
-
     for (const external of externalPatients) {
       if (arePatientsAMatch(internal, external)) {
-        const score = calculateMatchScore(internal, external, query);
+        const score = calculateMatchScore(internal, external);
         matches.push({ internal, external, score });
-        if (matches.length >= 10) break; // Get more candidates before sorting
       }
     }
   }
 
-  // Sort by score descending and return top 5
+  // Sort by score descending
   matches.sort((a, b) => b.score - a.score);
-  return matches.slice(0, 5);
+  return matches;
+}
+
+/**
+ * Gets full PatientMatch objects from the matches.csv file by reading IDs and fetching patient data
+ * @returns Array of complete PatientMatch objects with full patient data
+ */
+export async function getProvidersFromFile(): Promise<PatientMatch[]> {
+  try {
+    // Read the match records from CSV
+    const matchRecords = await readAllMatches();
+
+    if (matchRecords.length === 0) {
+      return [];
+    }
+
+    // Get all patient data
+    const [internalPatients, externalPatients] = await Promise.all([
+      getInternalPatients(),
+      getExternalPatients(),
+    ]);
+
+    // Create lookup maps for efficient searching
+    const internalMap = new Map(
+      internalPatients.map((patient) => [patient.InternalPatientId, patient])
+    );
+    const externalMap = new Map(
+      externalPatients.map((patient) => [patient.ExternalPatientId, patient])
+    );
+
+    // Build complete PatientMatch objects
+    const fullMatches: PatientMatch[] = [];
+
+    for (const record of matchRecords) {
+      const internal = internalMap.get(record.InternalPatientId);
+      const external = externalMap.get(record.ExternalPatientId);
+
+      if (internal && external) {
+        const match: PatientMatch = {
+          internal,
+          external,
+          score: calculateMatchScore(internal, external), // Recalculate the score
+          status: record.Status ? (parseInt(record.Status) as MatchStatus) : 0,
+        };
+
+        fullMatches.push(match);
+      } else {
+        console.warn(
+          `Missing patient data for match: ${record.InternalPatientId} - ${record.ExternalPatientId}`
+        );
+      }
+    }
+
+    // Sort by score descending
+    fullMatches.sort((a, b) => b.score - a.score);
+
+    return fullMatches;
+  } catch (error) {
+    console.error("Error getting providers from file:", error);
+    return [];
+  }
 }
