@@ -12,8 +12,8 @@ The application uses a sophisticated scoring system to identify potential patien
 
 ### **Field Weighting**
 
-- **First Name**: 25% weight
-- **Last Name**: 15% weight
+- **First Name**: 15% weight
+- **Last Name**: 25% weight
 - **Date of Birth**: 25% weight
 - **Phone Number**: 20% weight
 - **Address**: 15% weight

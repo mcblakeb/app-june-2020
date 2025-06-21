@@ -96,11 +96,11 @@ function calculateMatchScore(
   let totalScore = 0;
   let totalWeight = 0;
 
-  totalScore += (firstNameMatch ? 1.0 : firstNameSimilarity) * 0.25;
-  totalWeight += 0.25;
-
-  totalScore += (lastNameMatch ? 1.0 : lastNameSimilarity) * 0.15;
+  totalScore += (firstNameMatch ? 1.0 : firstNameSimilarity) * 0.15;
   totalWeight += 0.15;
+
+  totalScore += (lastNameMatch ? 1.0 : lastNameSimilarity) * 0.25;
+  totalWeight += 0.25;
 
   totalScore += (dobMatch ? 1.0 : 0.0) * 0.25;
   totalWeight += 0.25;
