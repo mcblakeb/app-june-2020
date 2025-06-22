@@ -14,7 +14,7 @@ export default function DenyButton({
       onClick={onClick}
       disabled={disabled}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
+        if (e.key === "Enter") {
           e.preventDefault();
           if (!disabled) onClick();
         }
@@ -29,6 +29,7 @@ export default function DenyButton({
         ${className}
       `}
     >
+      {/* SVG icon for the button */}
       <svg
         className="w-4 h-4"
         fill="none"

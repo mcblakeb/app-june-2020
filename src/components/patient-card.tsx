@@ -5,19 +5,19 @@ import { removeMatchFromCsv, acceptMatchInCsv } from "@/actions/file-actions";
 import { useState } from "react";
 import MatchIndicator from "./match-indicator";
 
-interface ProviderCardProps {
+interface PatientCardProps {
   match: PatientMatch;
   index: number;
   onMatchRemoved?: () => void;
   isRefreshing?: boolean;
 }
 
-export default function ProviderCard({
+export default function PatientCard({
   match,
   index,
   onMatchRemoved,
   isRefreshing = false,
-}: ProviderCardProps) {
+}: PatientCardProps) {
   const [isAccepting, setIsAccepting] = useState(false);
   const [isDenying, setIsDenying] = useState(false);
   const { internal, external, score } = match;

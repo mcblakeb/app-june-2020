@@ -1,4 +1,4 @@
-# Provider Match Application
+# Patient Match Application
 
 ## Overview
 
@@ -24,6 +24,7 @@ The application uses a sophisticated scoring system to identify potential patien
 2. **Similarity Scores**: Non-exact fields use Levenshtein distance to calculate similarity ratios
 3. **Weighted Average**: All field scores are combined using their respective weights
 4. **Bonus System**: Additional points awarded for multiple exact matches (5% for 2+ matches, 10% for 3+ matches)
+5. For some fields commonly two or more tokens, tokenOverlapScore could be used as well. In this case, it's applied to address as well as the similarityRatio field, since that commonly has 2+ terms.
 
 ### **Match Criteria**
 

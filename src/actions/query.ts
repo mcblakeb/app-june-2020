@@ -7,7 +7,7 @@ import {
   PatientMatch,
   MatchStatus,
 } from "../types/types";
-import { similarityRatio } from "../util/l-distance";
+import { similarityRatio, tokenOverlapScore } from "../util/l-distance";
 import { readAllMatches } from "@/actions/file-actions";
 import { normalizeDate } from "@/util/date";
 
@@ -91,6 +91,12 @@ function calculateMatchScore(
     normalize(internal.Address || ""),
     normalize(external.Address || "")
   );
+  const addressTokenOverlap = tokenOverlapScore(
+    normalize(internal.Address || ""),
+    normalize(external.Address || "")
+  );
+
+  const combinedAddressScore = (addressSimilarity + addressTokenOverlap) / 2;
 
   // Calculate weighted score based on all available data
   let totalScore = 0;
@@ -108,7 +114,7 @@ function calculateMatchScore(
   totalScore += (phoneMatch ? 1.0 : 0.0) * 0.2;
   totalWeight += 0.2;
 
-  totalScore += (addressMatch ? 1.0 : addressSimilarity) * 0.15;
+  totalScore += (addressMatch ? 1.0 : combinedAddressScore) * 0.15;
   totalWeight += 0.15;
 
   // Calculate final score as weighted average
@@ -167,7 +173,7 @@ export async function findAllPatientMatches(): Promise<PatientMatch[]> {
  * Gets full PatientMatch objects from the matches.csv file by reading IDs and fetching patient data
  * @returns Array of complete PatientMatch objects with full patient data
  */
-export async function getProvidersFromFile(): Promise<PatientMatch[]> {
+export async function getPatientsFromFile(): Promise<PatientMatch[]> {
   try {
     // Read the match records from CSV
     const matchRecords = await readAllMatches();
@@ -218,7 +224,7 @@ export async function getProvidersFromFile(): Promise<PatientMatch[]> {
 
     return fullMatches;
   } catch (error) {
-    console.error("Error getting providers from file:", error);
+    console.error("Error getting patients from file:", error);
     return [];
   }
 }

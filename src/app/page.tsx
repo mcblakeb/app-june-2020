@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { findAllPatientMatches, getProvidersFromFile } from "@/actions/query";
+import { findAllPatientMatches, getPatientsFromFile } from "@/actions/query";
 import {
   writeMatchesToCsv,
   checkFileEmpty,
   clearMatchesFile,
 } from "@/actions/file-actions";
 import { PatientMatch } from "@/types/types";
-import ProviderCard from "@/components/provider-card";
+import PatientCard from "@/components/patient-card";
 import LoadingSpinner from "@/components/loading";
 
 function ProviderMatchContent({ onReset }: { onReset: () => void }) {
@@ -27,7 +27,7 @@ function ProviderMatchContent({ onReset }: { onReset: () => void }) {
       }
 
       // Load matches from the matches.csv file
-      const matchesFromFile = await getProvidersFromFile();
+      const matchesFromFile = await getPatientsFromFile();
       setResults(matchesFromFile);
     } catch (error) {
       console.error("Error loading matches:", error);
@@ -98,7 +98,7 @@ function ProviderMatchContent({ onReset }: { onReset: () => void }) {
       {/* Filtered results */}
       <div className="space-y-4">
         {filteredResults.map((result, index) => (
-          <ProviderCard
+          <PatientCard
             key={index}
             match={result}
             index={index}

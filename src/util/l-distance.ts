@@ -34,6 +34,7 @@ function similarityRatio(s1: string, s2: string): number {
 }
 
 // Token-based overlap score
+// (overlap for words)
 function tokenOverlapScore(s1: string, s2: string): number {
   const tokens1 = new Set(s1.split(/\s+/));
   const tokens2 = new Set(s2.split(/\s+/));
