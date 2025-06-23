@@ -100,3 +100,15 @@ The algorithm uses Levenshtein distance to measure string similarity:
 6. Open your browser and go to [http://localhost:3000](http://localhost:3000)
 
 ---
+
+## Running Tests
+
+To run the Jest test suite, use the following command:
+
+```bash
+npm run test
+```
+
+This will execute all unit and integration tests and display the results in your terminal.
+
+---
