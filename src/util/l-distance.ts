@@ -51,4 +51,4 @@ function tokenOverlapScore(s1: string, s2: string): number {
   return intersection.size / union.size;
 }
 
-export { similarityRatio, tokenOverlapScore };
+export { similarityRatio, tokenOverlapScore, levenshteinDistance };
